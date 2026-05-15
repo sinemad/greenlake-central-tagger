@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GreenLake Central Tagger</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #f4f7fb;
+      color: #1b2638;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+      padding: 24px;
+    }
+    h1 {
+      margin-top: 0;
+    }
+    label {
+      display: block;
+      margin: 16px 0 4px;
+      font-weight: 600;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+    .checkbox-group label {
+      display: inline;
+      margin: 0;
+      font-weight: normal;
+    }
+    .tag-panel {
+      margin-top: 24px;
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .tag-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .tag-panel-header h2 {
+      margin: 0;
+    }
+    .tag-panel-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .tag-panel-actions button {
+      margin: 0;
+      padding: 6px 14px;
+      font-size: 13px;
+      background: #e5e7eb;
+      color: #1b2638;
+    }
+    .tag-panel-actions button:hover {
+      background: #d1d5db;
+    }
+    .tag-count {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+    .tag-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 6px 16px;
+    }
+    .tag-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tag-item input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+      flex-shrink: 0;
+    }
+    .tag-item label {
+      margin: 0;
+      font-weight: normal;
+      font-size: 14px;
+      word-break: break-all;
+      cursor: pointer;
+    }
+    .fetch-button {
+      margin-top: 12px;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+    .gl-api-url {
+      display: block;
+      margin-top: 4px;
+      font-family: Menlo, Monaco, monospace;
+      font-size: 13px;
+      color: #2563eb;
+      word-break: break-all;
+    }
+    button {
+      margin-top: 20px;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .section {
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .output {
+      min-height: 180px;
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, monospace;
+      background: #111827;
+      color: #f8fafc;
+      padding: 16px;
+      border-radius: 10px;
+      overflow: auto;
+    }
+    .advanced {
+      margin-top: 24px;
+      background: #eef2ff;
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .gateway-url {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #6b7280;
+      font-family: Menlo, Monaco, monospace;
+      padding: 6px 10px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GreenLake Central Tagger</h1>
+    <p>Enter Aruba Central and HPE GreenLake credentials, then sync site tags to access points.</p>
+
+    <div class="grid">
+      <div class="section">
+        <h2>Aruba Central</h2>
+        <label for="ac-gateway-select">API Gateway</label>
+        <select id="ac-gateway-select">
+          <option value="">Select a gateway…</option>
+          <optgroup label="Classic Central">
+            <option value="https://app1-apigw.central.arubanetworks.com">US-1</option>
+            <option value="https://apigw-prod2.central.arubanetworks.com">US-2</option>
+            <option value="https://apigw-us-east-1.central.arubanetworks.com">US-East1</option>
+            <option value="https://apigw-uswest4.central.arubanetworks.com">US-West4</option>
+            <option value="https://apigw-uswest5.central.arubanetworks.com">US-West5</option>
+            <option value="https://eu-apigw.central.arubanetworks.com">EU-1</option>
+            <option value="https://apigw-eucentral2.central.arubanetworks.com">EU-Central2</option>
+            <option value="https://apigw-eucentral3.central.arubanetworks.com">EU-Central3</option>
+            <option value="https://apigw-ca.central.arubanetworks.com">Canada-1</option>
+            <option value="https://apigw.central.arubanetworks.com.cn">China-1</option>
+            <option value="https://api-ap.central.arubanetworks.com">APAC-1</option>
+            <option value="https://apigw-apaceast.central.arubanetworks.com">APAC-EAST1</option>
+            <option value="https://apigw-apacsouth.central.arubanetworks.com">APAC-SOUTH1</option>
+            <option value="https://apigw-uaenorth1.central.arubanetworks.com">UAE-NORTH1</option>
+          </optgroup>
+          <optgroup label="New Central">
+            <option value="https://de1.api.central.arubanetworks.com">EU-1 (eu)</option>
+            <option value="https://de2.api.central.arubanetworks.com">EU-Central2 (eucentral2)</option>
+            <option value="https://de3.api.central.arubanetworks.com">EU-Central3 (eucentral3)</option>
+            <option value="https://gb1.api.central.arubanetworks.com">UK (ukwest2)</option>
+            <option value="https://us1.api.central.arubanetworks.com">US-1 (prod)</option>
+            <option value="https://us2.api.central.arubanetworks.com">US-2 (central-prod2)</option>
+            <option value="https://us4.api.central.arubanetworks.com">US-WEST-4 (uswest4)</option>
+            <option value="https://us5.api.central.arubanetworks.com">US-WEST-5 (uswest5)</option>
+            <option value="https://us6.api.central.arubanetworks.com">US-East1 (us-east-1)</option>
+            <option value="https://ca1.api.central.arubanetworks.com">Canada-1 (starman)</option>
+            <option value="https://in1.api.central.arubanetworks.com">APAC-1 (apac)</option>
+            <option value="https://jp1.api.central.arubanetworks.com">APAC-EAST1 (apaceast)</option>
+            <option value="https://au1.api.central.arubanetworks.com">APAC-SOUTH1 (apacsouth)</option>
+            <option value="https://ae1.api.central.arubanetworks.com">UAE (uaenorth1)</option>
+            <option value="https://cn1.api.central.arubanetworks.com.cn">China (china-prod)</option>
+            <option value="https://internal.api.central.arubanetworks.com">Internal (internal)</option>
+          </optgroup>
+        </select>
+        <input id="ac-base-url" class="gateway-url" type="url" placeholder="https://…  (editable)" />
+
+        <label for="ac-access-token">Access Token</label>
+        <textarea id="ac-access-token" rows="3" placeholder="Paste your Aruba Central access token here"></textarea>
+        <button id="fetch-button" class="fetch-button">Fetch Sites</button>
+      </div>
+
+      <div class="section">
+        <h2>HPE GreenLake</h2>
+        <label>GreenLake API URL</label>
+        <a id="gl-api-url-display" href="https://global.api.greenlake.hpe.com" target="_blank" rel="noopener" class="gl-api-url">https://global.api.greenlake.hpe.com</a>
+        <div class="checkbox-group" style="margin-top:10px">
+          <input id="gl-custom-url-toggle" type="checkbox" />
+          <label for="gl-custom-url-toggle">Use custom API URL</label>
+        </div>
+        <input id="gl-api-url" type="url" placeholder="https://…" style="display:none; margin-top:6px" />
+
+        <label for="gl-client-id">Client ID</label>
+        <input id="gl-client-id" type="text" />
+
+        <label for="gl-client-secret">Client Secret</label>
+        <input id="gl-client-secret" type="password" />
+
+        <label for="gl-tag-key">Tag key</label>
+        <input id="gl-tag-key" type="text" value="ArubaCentralSite" placeholder="ArubaCentralSite" />
+      </div>
+    </div>
+
+    <div id="tag-panel" class="tag-panel" style="display:none">
+      <div class="tag-panel-header">
+        <h2>Sites to sync</h2>
+        <div class="tag-panel-actions">
+          <button id="select-all-button">Select all</button>
+          <button id="deselect-all-button">Deselect all</button>
+        </div>
+      </div>
+      <div id="tag-count" class="tag-count"></div>
+      <div id="tag-grid" class="tag-grid"></div>
+    </div>
+
+    <button id="sync-button">Start Sync</button>
+
+    <h2>Sync output</h2>
+    <div id="output" class="output">Ready to sync.</div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

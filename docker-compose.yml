@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  greenlake-central-tagger:
+    build: .
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  gateway-updater:
+    build: .
+    volumes:
+      - ./app/static:/usr/src/app/app/static
+      - ./scripts:/usr/src/app/scripts:ro
+    entrypoint: ["python", "/usr/src/app/scripts/update_gateways.py", "86400"]
+    restart: unless-stopped
