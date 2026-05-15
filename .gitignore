@@ -1,11 +1,6 @@
 # Dev overrides
 docker-compose.override.yml
 
-# Claude / planning files
-CLAUDE.md
-PLANNING.md
-PLAN.md
-
 # Python
 __pycache__/
 *.py[cod]
