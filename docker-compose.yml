@@ -4,7 +4,7 @@ services:
   greenlake-central-tagger:
     build: .
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8000}:8000"
     restart: unless-stopped
 
   gateway-updater:
