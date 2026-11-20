@@ -54,7 +54,7 @@ pytest                           # run tests
 
 - Group names are read from the AP listing. Classic Central (`/monitoring/v2/aps`) reports `group_name`. Unverified for the New Central endpoint. If it's missing there, only the site tag is applied. `pycentral`'s `configuration.get_devices_group` is the per-device fallback if that's needed.
 - Cleanup of outdated tags/assignments is implemented in `GreenlakeTagClient` but not exposed by the API or UI.
-- `scripts/update_gateways.py` has no tests and no CI config exists.
+- No CI config exists.
 
 ## Active objectives
 
