@@ -186,15 +186,23 @@ class GreenlakeDeviceClient:
         device_ids: List[str],
         tag_value: str,
     ) -> List[Dict[str, Any]]:
-        """PATCH the site tag onto devices in batches of 25.
-        Returns list of {batch, result} dicts."""
+        """PATCH the site tag (self.tag_key) onto devices in batches of 25."""
+        return self.patch_device_tags(device_ids, {self.tag_key: tag_value})
+
+    def patch_device_tags(
+        self,
+        device_ids: List[str],
+        tags: Dict[str, str],
+    ) -> List[Dict[str, Any]]:
+        """PATCH one or more tags (merge-patch) onto devices in batches of 25.
+        Returns list of {devices, result} dicts."""
         results = []
         for batch in _chunks(device_ids, _PATCH_BATCH_SIZE):
             result = self._request(
                 "PATCH",
                 _DEVICES_PATCH_PATH,
                 params=[("id", did) for did in batch],
-                json_payload={"tags": {self.tag_key: tag_value}},
+                json_payload={"tags": dict(tags)},
                 content_type="application/merge-patch+json",
             )
             results.append({"devices": batch, "result": result})

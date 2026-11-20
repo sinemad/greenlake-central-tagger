@@ -1,7 +1,7 @@
-import traceback
+import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 
 from app.services.aruba_central import ArubaCentralClient, ArubaCentralError
 from app.services.greenlake_devices import GreenlakeDeviceClient, GreenlakeDeviceError
+
+logger = logging.getLogger("uvicorn.error")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -22,10 +24,11 @@ app = FastAPI(title="GreenLake Central Tagger", version="0.1.0")
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc), "traceback": traceback.format_exc()},
+    # Log details server-side only; never return exception text or tracebacks to clients.
+    logger.error(
+        "Unhandled error on %s %s", request.method, request.url.path, exc_info=exc
     )
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 app.add_middleware(
@@ -48,6 +51,8 @@ class GreenlakeConfig(BaseModel):
     client_id: str = Field(..., title="GreenLake API client ID")
     client_secret: str = Field(..., title="GreenLake API client secret")
     tag_key: str = Field("ArubaCentralSite", title="Tag key applied to matched devices")
+    tag_groups: bool = Field(True, title="Also tag devices with their Central group")
+    group_tag_key: str = Field("ArubaCentralGroup", title="Tag key for the Central group")
 
 
 class SitesRequest(BaseModel):
@@ -91,6 +96,12 @@ async def sync_tags(body: SyncRequest):
         set(body.selected_sites) if body.selected_sites is not None else None
     )
 
+    if body.greenlake.tag_groups and body.greenlake.group_tag_key == body.greenlake.tag_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Site tag key and group tag key must be different.",
+        )
+
     # 1. Fetch APs with site assignments from Aruba Central
     try:
         aruba = ArubaCentralClient(
@@ -128,18 +139,21 @@ async def sync_tags(body: SyncRequest):
         raise HTTPException(status_code=400, detail=str(exc))
 
     # 3. Match each AP to a GreenLake device
-    site_to_device_ids: Dict[str, List[str]] = defaultdict(list)
+    # (site, group-or-None) -> device ids; devices in the same pair share one PATCH payload
+    tag_targets: Dict[Tuple[str, Optional[str]], List[str]] = defaultdict(list)
     matched: List[Dict[str, Any]] = []
     unmatched: List[Dict[str, Any]] = []
 
     for ap in all_aps:
         device_id = lookup.get(ap["serial"]) or lookup.get(ap["mac"])
         if device_id:
-            site_to_device_ids[ap["site_name"]].append(device_id)
+            group = (ap.get("group_name") or None) if body.greenlake.tag_groups else None
+            tag_targets[(ap["site_name"], group)].append(device_id)
             matched.append({
                 "ap_name": ap["ap_name"],
                 "serial": ap["serial"],
                 "site": ap["site_name"],
+                "group": group,
                 "greenlake_device_id": device_id,
             })
         else:
@@ -154,13 +168,21 @@ async def sync_tags(body: SyncRequest):
     # 4. PATCH tags onto matched devices, batched by site
     patch_results: List[Dict[str, Any]] = []
     try:
-        for site_name, device_ids in site_to_device_ids.items():
-            results = gl.patch_tags(device_ids, site_name)
-            patch_results.append({"site": site_name, "device_count": len(device_ids), "batches": results})
+        for (site_name, group), device_ids in tag_targets.items():
+            tags = {body.greenlake.tag_key: site_name}
+            if group:
+                tags[body.greenlake.group_tag_key] = group
+            results = gl.patch_device_tags(device_ids, tags)
+            patch_results.append({
+                "site": site_name,
+                "group": group,
+                "device_count": len(device_ids),
+                "batches": results,
+            })
     except GreenlakeDeviceError as exc:
         raise HTTPException(status_code=500, detail=f"Tag patch failed: {exc}")
 
-    sites_synced = sorted(site_to_device_ids.keys())
+    sites_synced = sorted({site for site, _ in tag_targets})
 
     return {
         "site_count": len(sites_synced),

@@ -33,6 +33,15 @@ glCustomUrlToggle.addEventListener('change', () => {
   }
 });
 
+const glTagGroups = document.getElementById('gl-tag-groups');
+const glGroupTagKey = document.getElementById('gl-group-tag-key');
+
+function syncGroupTagControls() {
+  glGroupTagKey.disabled = !glTagGroups.checked;
+}
+glTagGroups.addEventListener('change', syncGroupTagControls);
+syncGroupTagControls();
+
 function log(message) {
   output.textContent += `\n${message}`;
   output.scrollTop = output.scrollHeight;
@@ -58,6 +67,8 @@ function getFormData() {
       client_id: document.getElementById('gl-client-id').value.trim(),
       client_secret: document.getElementById('gl-client-secret').value,
       tag_key: document.getElementById('gl-tag-key').value.trim() || 'ArubaCentralSite',
+      tag_groups: document.getElementById('gl-tag-groups').checked,
+      group_tag_key: document.getElementById('gl-group-tag-key').value.trim() || 'ArubaCentralGroup',
     },
     selected_sites: selectedSites.length > 0 ? selectedSites : undefined,
   };
@@ -167,7 +178,6 @@ async function syncTags() {
 
     if (!response.ok) {
       log(`Error: ${result.detail || JSON.stringify(result)}`);
-      if (result.traceback) log(result.traceback);
       return;
     }
 

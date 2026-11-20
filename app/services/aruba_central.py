@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
-import requests
+from pycentral.base import ArubaCentralBase
 
 
 class ArubaCentralError(Exception):
@@ -27,8 +27,39 @@ class ArubaCentralClient:
 
     def __init__(self, base_url: str, access_token: str):
         self.base_url = base_url.rstrip("/")
-        self._session = requests.Session()
-        self._session.headers.update({"Authorization": f"Bearer {access_token}"})
+        try:
+            self._central = ArubaCentralBase(
+                central_info={
+                    "base_url": self.base_url,
+                    "token": {"access_token": access_token},
+                },
+                ssl_verify=True,
+            )
+        # pycentral calls sys.exit()/exit() on bad input; never let that escape.
+        except (SystemExit, KeyError, ValueError) as exc:
+            raise ArubaCentralError(f"Invalid Aruba Central configuration: {exc}") from exc
+
+    def _get_page(self, path: str, offset: int, limit: int) -> Optional[Dict[str, Any]]:
+        """GET one page via pycentral. Returns None on 404, the JSON body otherwise."""
+        try:
+            result = self._central.command(
+                apiMethod="GET",
+                apiPath=path,
+                apiParams={"offset": offset, "limit": limit},
+            )
+        # pycentral calls exit() on unexpected failures (e.g. connection errors).
+        except (SystemExit, Exception) as exc:
+            raise ArubaCentralError(f"Request failed for {path}: {exc}") from exc
+
+        code = result.get("code")
+        msg = result.get("msg")
+        if code == 404:
+            return None
+        if not (isinstance(code, int) and 200 <= code < 300):
+            raise ArubaCentralError(f"API error {code} from {path}: {str(msg)[:400]}")
+        if not isinstance(msg, dict):
+            raise ArubaCentralError(f"Unexpected non-JSON response from {path}: {str(msg)[:400]}")
+        return msg
 
     # ------------------------------------------------------------------
     # Sites
@@ -53,24 +84,9 @@ class ArubaCentralClient:
         limit = 1000
 
         while True:
-            try:
-                resp = self._session.get(
-                    self.base_url + path,
-                    params={"offset": offset, "limit": limit},
-                    timeout=30,
-                )
-            except requests.RequestException as exc:
-                raise ArubaCentralError(f"Request failed for {path}: {exc}") from exc
-
-            if resp.status_code == 404:
+            data = self._get_page(path, offset, limit)
+            if data is None:
                 return None
-
-            if not resp.ok:
-                raise ArubaCentralError(
-                    f"API error {resp.status_code} from {path}: {resp.text[:400]}"
-                )
-
-            data: Dict[str, Any] = resp.json()
             items: List[Any] = (
                 data.get("items") or data.get("data") or data.get("sites") or []
             )
@@ -103,6 +119,7 @@ class ArubaCentralClient:
           mac         – normalised MAC (lower-case, no separators)
           site_name   – Aruba Central site name
           ap_name     – AP hostname / name
+          group_name  – Central group name (empty if the endpoint doesn't report one)
         """
         last_error: Optional[Exception] = None
         for endpoint in self._APS_ENDPOINTS:
@@ -122,24 +139,9 @@ class ArubaCentralClient:
         limit = 1000
 
         while True:
-            try:
-                resp = self._session.get(
-                    self.base_url + path,
-                    params={"offset": offset, "limit": limit},
-                    timeout=30,
-                )
-            except requests.RequestException as exc:
-                raise ArubaCentralError(f"Request failed for {path}: {exc}") from exc
-
-            if resp.status_code == 404:
+            data = self._get_page(path, offset, limit)
+            if data is None:
                 return None
-
-            if not resp.ok:
-                raise ArubaCentralError(
-                    f"API error {resp.status_code} from {path}: {resp.text[:400]}"
-                )
-
-            data: Dict[str, Any] = resp.json()
             items: List[Any] = (
                 data.get("aps")
                 or data.get("items")
@@ -181,7 +183,17 @@ class ArubaCentralClient:
             item.get("ap_name") or item.get("name") or item.get("hostname") or ""
         ).strip()
 
+        group_name = str(
+            item.get("group_name") or item.get("group") or item.get("groupName") or ""
+        ).strip()
+
         if not site_name:
             return None  # skip APs not assigned to a site
 
-        return {"serial": serial, "mac": mac, "site_name": site_name, "ap_name": ap_name}
+        return {
+            "serial": serial,
+            "mac": mac,
+            "site_name": site_name,
+            "ap_name": ap_name,
+            "group_name": group_name,
+        }
